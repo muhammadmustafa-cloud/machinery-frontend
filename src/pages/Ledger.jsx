@@ -14,6 +14,8 @@ export default function Ledger() {
   
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [filterItem, setFilterItem] = useState('');
+  const [filterMachine, setFilterMachine] = useState('');
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -23,13 +25,15 @@ export default function Ledger() {
   useEffect(() => {
     fetchLedger();
     fetchItemsAndMachines();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, filterItem, filterMachine]);
 
   const fetchLedger = async () => {
     try {
       let url = `${API_BASE_URL}/api/ledger?`;
       if (startDate) url += `startDate=${startDate}&`;
       if (endDate) url += `endDate=${endDate}&`;
+      if (filterItem) url += `itemId=${filterItem}&`;
+      if (filterMachine) url += `machineId=${filterMachine}&`;
 
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
@@ -103,11 +107,20 @@ export default function Ledger() {
     else if (startDate) subtitle += `From ${startDate}`;
     else if (endDate) subtitle += `Until ${endDate}`;
     else subtitle += 'All Time';
+
+    if (filterItem) {
+      const selectedItem = items.find(i => i._id === filterItem);
+      subtitle += ` | Item: ${selectedItem?.name || 'Unknown'}`;
+    }
+    if (filterMachine) {
+      const selectedMachine = machines.find(m => m._id === filterMachine);
+      subtitle += ` | Machine: ${selectedMachine?.name || 'Unknown'}`;
+    }
     doc.text(subtitle, 14, 34);
     
     doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 40);
 
-    const tableColumn = ["Date", "Type", "Item", "Quantity", "Machine/Supplier", "Remarks"];
+    const tableColumn = ["Date", "Type", "Item", "Quantity", "Machine", "Supplier", "Remarks"];
     const tableRows = [];
 
     ledger.forEach(entry => {
@@ -115,10 +128,11 @@ export default function Ledger() {
       const type = entry.type === 'IN' ? 'STOCK IN' : 'USED';
       const item = `${entry.item?.name || 'Unknown'} (${entry.item?.sku || ''})`;
       const qty = `${entry.type === 'IN' ? '+' : '-'}${entry.quantity} ${entry.item?.unit || ''}`;
-      const machineOrSupplier = entry.type === 'OUT' ? (entry.machine?.name || 'Unknown') : (entry.supplier || 'N/A');
+      const machine = entry.type === 'OUT' ? (entry.machine?.name || 'Unknown') : '-';
+      const supplier = entry.type === 'IN' ? (entry.supplier || 'N/A') : '-';
       const remarks = entry.remarks || (entry.type === 'IN' && entry.price ? `Cost: $${entry.price}` : '-');
 
-      tableRows.push([date, type, item, qty, machineOrSupplier, remarks]);
+      tableRows.push([date, type, item, qty, machine, supplier, remarks]);
     });
 
     autoTable(doc, {
@@ -141,9 +155,9 @@ export default function Ledger() {
         fillColor: [248, 250, 252] // Slate-50
       },
       columnStyles: {
-        0: { halign: 'center', cellWidth: 25 },
-        1: { halign: 'center', cellWidth: 25 },
-        3: { halign: 'center', cellWidth: 25 }
+        0: { halign: 'center', cellWidth: 20 },
+        1: { halign: 'center', cellWidth: 22 },
+        3: { halign: 'center', cellWidth: 20 }
       },
       didDrawPage: function (data) {
         // Footer with page number
@@ -163,12 +177,12 @@ export default function Ledger() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Maintenance Ledger</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Track all stock additions and machine consumptions.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Maintenance Ledger</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Track all stock additions and machine consumptions.</p>
+      </div>
+
+      <div className="flex items-center gap-3">
           <div className="flex items-center space-x-2 bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-lg p-1">
             <Filter className="h-4 w-4 text-gray-400 ml-2" />
             <input 
@@ -185,6 +199,29 @@ export default function Ledger() {
               className="text-sm border-none bg-transparent focus:ring-0 text-gray-700 dark:text-gray-300 w-32 outline-none"
             />
           </div>
+          
+          <select 
+            value={filterItem} 
+            onChange={e => setFilterItem(e.target.value)}
+            className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors cursor-pointer"
+          >
+            <option value="">All Items</option>
+            {items.map(item => (
+              <option key={item._id} value={item._id}>{item.name}</option>
+            ))}
+          </select>
+
+          <select 
+            value={filterMachine} 
+            onChange={e => setFilterMachine(e.target.value)}
+            className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors cursor-pointer"
+          >
+            <option value="">All Machines</option>
+            {machines.map(machine => (
+              <option key={machine._id} value={machine._id}>{machine.name}</option>
+            ))}
+          </select>
+
           <button 
             onClick={exportPDF}
             className="flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors"
@@ -200,7 +237,6 @@ export default function Ledger() {
             Consume Stock
           </button>
         </div>
-      </div>
 
       <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
@@ -210,7 +246,9 @@ export default function Ledger() {
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Item Details</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Quantity</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Machine / Info</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Machine</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Supplier</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Remarks</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
               </tr>
             </thead>
@@ -238,17 +276,19 @@ export default function Ledger() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    {entry.type === 'OUT' ? (
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">{entry.machine?.name || 'Unknown Machine'}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{entry.remarks || 'No remarks'}</div>
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">Supplier: {entry.supplier || 'N/A'}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Cost: ${entry.price || 0}</div>
-                      </div>
-                    )}
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {entry.type === 'OUT' ? (entry.machine?.name || 'Unknown Machine') : '-'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {entry.type === 'IN' ? (entry.supplier || 'N/A') : '-'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {entry.remarks || (entry.type === 'IN' && entry.price ? `Cost: $${entry.price}` : 'No remarks')}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {new Date(entry.date).toLocaleString()}
@@ -257,7 +297,7 @@ export default function Ledger() {
               ))}
               {ledger.length === 0 && (
                 <tr>
-                  <td colSpan="5" className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan="7" className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     <ClipboardList className="h-10 w-10 mx-auto mb-3 opacity-50" />
                     No ledger entries found.
                   </td>
