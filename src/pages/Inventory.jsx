@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Package, ArrowDownToLine, AlertTriangle } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 export default function Inventory() {
   const [items, setItems] = useState([]);
@@ -21,7 +22,7 @@ export default function Inventory() {
 
   const fetchItems = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/items', {
+      const res = await fetch(`${API_BASE_URL}/api/items`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -38,8 +39,8 @@ export default function Inventory() {
 
     try {
       const url = editingItem 
-        ? `http://localhost:5000/api/items/${editingItem._id}`
-        : 'http://localhost:5000/api/items';
+        ? `${API_BASE_URL}/api/items/${editingItem._id}`
+        : `${API_BASE_URL}/api/items`;
       const method = editingItem ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -67,7 +68,7 @@ export default function Inventory() {
     setErrorMsg('');
 
     try {
-      const res = await fetch('http://localhost:5000/api/ledger/in', {
+      const res = await fetch(`${API_BASE_URL}/api/ledger/in`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(stockForm)
@@ -88,7 +89,7 @@ export default function Inventory() {
 
   const handleDeleteItem = async (id) => {
     if (confirm('Are you sure you want to delete this item?')) {
-      await fetch(`http://localhost:5000/api/items/${id}`, {
+      await fetch(`${API_BASE_URL}/api/items/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

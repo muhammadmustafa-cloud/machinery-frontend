@@ -1,6 +1,7 @@
 import React from 'react';
 import { LayoutDashboard, Users, Settings, Package, FileText, Settings2, LogOut } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
 
 export default function Sidebar() {
   const navigate = useNavigate();
@@ -15,7 +16,7 @@ export default function Sidebar() {
 
   const handleSignOut = async () => {
     try {
-      await fetch('http://localhost:5000/api/auth/signout', {
+      await fetch(`${API_BASE_URL}/api/auth/signout`, {
         method: 'POST',
       });
     } catch (error) {

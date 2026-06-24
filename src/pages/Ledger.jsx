@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowUpRight, ArrowDownRight, ClipboardList, PackageOpen, Download, Filter } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { API_BASE_URL } from '../config';
 
 export default function Ledger() {
   const [ledger, setLedger] = useState([]);
@@ -26,7 +27,7 @@ export default function Ledger() {
 
   const fetchLedger = async () => {
     try {
-      let url = 'http://localhost:5000/api/ledger?';
+      let url = `${API_BASE_URL}/api/ledger?`;
       if (startDate) url += `startDate=${startDate}&`;
       if (endDate) url += `endDate=${endDate}&`;
 
@@ -43,8 +44,8 @@ export default function Ledger() {
   const fetchItemsAndMachines = async () => {
     try {
       const [itemRes, machineRes] = await Promise.all([
-        fetch('http://localhost:5000/api/items', { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('http://localhost:5000/api/machines', { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`${API_BASE_URL}/api/items`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/machines`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
       if (itemRes.ok) setItems(await itemRes.json());
       if (machineRes.ok) setMachines(await machineRes.json());
@@ -57,7 +58,7 @@ export default function Ledger() {
     setErrorMsg('');
 
     try {
-      const res = await fetch('http://localhost:5000/api/ledger/out', {
+      const res = await fetch(`${API_BASE_URL}/api/ledger/out`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(consumeForm)

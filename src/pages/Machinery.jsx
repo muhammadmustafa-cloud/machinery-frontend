@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Settings2, Activity, MapPin } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 export default function Machinery() {
   const [machines, setMachines] = useState([]);
@@ -18,7 +19,7 @@ export default function Machinery() {
 
   const fetchMachines = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/machines', {
+      const res = await fetch(`${API_BASE_URL}/api/machines`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -35,8 +36,8 @@ export default function Machinery() {
 
     try {
       const url = editingMachine 
-        ? `http://localhost:5000/api/machines/${editingMachine._id}`
-        : 'http://localhost:5000/api/machines';
+        ? `${API_BASE_URL}/api/machines/${editingMachine._id}`
+        : `${API_BASE_URL}/api/machines`;
       const method = editingMachine ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -60,7 +61,7 @@ export default function Machinery() {
 
   const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this machine?')) {
-      await fetch(`http://localhost:5000/api/machines/${id}`, {
+      await fetch(`${API_BASE_URL}/api/machines/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
