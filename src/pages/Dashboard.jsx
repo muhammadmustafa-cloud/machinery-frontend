@@ -7,6 +7,9 @@ import Users from './Users';
 import Inventory from './Inventory';
 import Machinery from './Machinery';
 import Ledger from './Ledger';
+import Suppliers from './Suppliers';
+import ItemLedger from './ItemLedger';
+import DailyStock from './DailyStock';
 
 export default function Dashboard() {
   return (
@@ -23,6 +26,9 @@ export default function Dashboard() {
             <Route path="/machinery" element={<Machinery />} />
             <Route path="/ledger" element={<Ledger />} />
             <Route path="/users" element={<Users />} />
+            <Route path="/suppliers" element={<Suppliers />} />
+            <Route path="/inventory/:id/ledger" element={<ItemLedger />} />
+            <Route path="/daily-stock" element={<DailyStock />} />
           </Routes>
         </main>
       </div>

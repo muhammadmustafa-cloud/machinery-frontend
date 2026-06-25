@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowUpRight, ArrowDownRight, ClipboardList, PackageOpen, Download, Filter } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, ClipboardList, PackageOpen, Download, Filter, Plus, Trash2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { API_BASE_URL } from '../config';
@@ -8,14 +8,22 @@ export default function Ledger() {
   const [ledger, setLedger] = useState([]);
   const [items, setItems] = useState([]);
   const [machines, setMachines] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   
-  const [isConsumeModalOpen, setIsConsumeModalOpen] = useState(false);
-  const [consumeForm, setConsumeForm] = useState({ item: '', machine: '', quantity: '', remarks: '' });
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [transactionForm, setTransactionForm] = useState({
+    type: 'IN',
+    supplier: '',
+    machine: '',
+    remarks: '',
+    items: [{ item: '', quantity: '', price: '' }]
+  });
   
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [filterItem, setFilterItem] = useState('');
   const [filterMachine, setFilterMachine] = useState('');
+  const [filterType, setFilterType] = useState('');
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -24,8 +32,8 @@ export default function Ledger() {
 
   useEffect(() => {
     fetchLedger();
-    fetchItemsAndMachines();
-  }, [startDate, endDate, filterItem, filterMachine]);
+    fetchData();
+  }, [startDate, endDate, filterItem, filterMachine, filterType]);
 
   const fetchLedger = async () => {
     try {
@@ -34,6 +42,7 @@ export default function Ledger() {
       if (endDate) url += `endDate=${endDate}&`;
       if (filterItem) url += `itemId=${filterItem}&`;
       if (filterMachine) url += `machineId=${filterMachine}&`;
+      if (filterType) url += `type=${filterType}&`;
 
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
@@ -45,35 +54,37 @@ export default function Ledger() {
     }
   };
 
-  const fetchItemsAndMachines = async () => {
+  const fetchData = async () => {
     try {
-      const [itemRes, machineRes] = await Promise.all([
+      const [itemRes, machineRes, supplierRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/items`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/api/machines`, { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`${API_BASE_URL}/api/machines`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/suppliers`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
       if (itemRes.ok) setItems(await itemRes.json());
       if (machineRes.ok) setMachines(await machineRes.json());
+      if (supplierRes.ok) setSuppliers(await supplierRes.json());
     } catch (err) {}
   };
 
-  const handleConsumeSubmit = async (e) => {
+  const handleTransactionSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMsg('');
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/ledger/out`, {
+      const res = await fetch(`${API_BASE_URL}/api/ledger/transaction`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(consumeForm)
+        body: JSON.stringify(transactionForm)
       });
       const data = await res.json();
       if (res.ok) {
-        setIsConsumeModalOpen(false);
+        setIsTransactionModalOpen(false);
         fetchLedger();
-        fetchItemsAndMachines(); // refresh stock
+        fetchData();
       } else {
-        setErrorMsg(data.message || 'Error consuming stock');
+        setErrorMsg(data.message || 'Error processing transaction');
       }
     } catch (err) {
       setErrorMsg('Network error');
@@ -82,10 +93,34 @@ export default function Ledger() {
     }
   };
 
-  const openConsumeModal = () => {
-    setConsumeForm({ item: '', machine: '', quantity: '', remarks: '' });
+  const openTransactionModal = () => {
+    setTransactionForm({
+      type: 'IN',
+      supplier: '',
+      machine: '',
+      remarks: '',
+      items: [{ item: '', quantity: '', price: '' }]
+    });
     setErrorMsg('');
-    setIsConsumeModalOpen(true);
+    setIsTransactionModalOpen(true);
+  };
+
+  const handleItemChange = (index, field, value) => {
+    const newItems = [...transactionForm.items];
+    newItems[index][field] = value;
+    setTransactionForm({ ...transactionForm, items: newItems });
+  };
+
+  const addItemRow = () => {
+    setTransactionForm({
+      ...transactionForm,
+      items: [...transactionForm.items, { item: '', quantity: '', price: '' }]
+    });
+  };
+
+  const removeItemRow = (index) => {
+    const newItems = transactionForm.items.filter((_, i) => i !== index);
+    setTransactionForm({ ...transactionForm, items: newItems });
   };
 
   const exportPDF = () => {
@@ -93,7 +128,7 @@ export default function Ledger() {
     
     // Header styling
     doc.setFontSize(22);
-    doc.setTextColor(37, 99, 235); // Blue-600
+    doc.setTextColor(37, 99, 235);
     doc.text('MACHINERY MILL ERP', 14, 20);
     
     doc.setFontSize(14);
@@ -116,6 +151,9 @@ export default function Ledger() {
       const selectedMachine = machines.find(m => m._id === filterMachine);
       subtitle += ` | Machine: ${selectedMachine?.name || 'Unknown'}`;
     }
+    if (filterType) {
+      subtitle += ` | Type: ${filterType === 'IN' ? 'STOCK IN' : 'USED'}`;
+    }
     doc.text(subtitle, 14, 34);
     
     doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 40);
@@ -129,7 +167,7 @@ export default function Ledger() {
       const item = `${entry.item?.name || 'Unknown'} (${entry.item?.sku || ''})`;
       const qty = `${entry.type === 'IN' ? '+' : '-'}${entry.quantity} ${entry.item?.unit || ''}`;
       const machine = entry.type === 'OUT' ? (entry.machine?.name || 'Unknown') : '-';
-      const supplier = entry.type === 'IN' ? (entry.supplier || 'N/A') : '-';
+      const supplier = entry.type === 'IN' ? (entry.supplier?.name || 'N/A') : '-';
       const remarks = entry.remarks || (entry.type === 'IN' && entry.price ? `Cost: $${entry.price}` : '-');
 
       tableRows.push([date, type, item, qty, machine, supplier, remarks]);
@@ -160,15 +198,10 @@ export default function Ledger() {
         3: { halign: 'center', cellWidth: 20 }
       },
       didDrawPage: function (data) {
-        // Footer with page number
         let str = 'Page ' + doc.internal.getNumberOfPages();
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
-        doc.text(
-          str,
-          data.settings.margin.left,
-          doc.internal.pageSize.height - 10
-        );
+        doc.text(str, data.settings.margin.left, doc.internal.pageSize.height - 10);
       }
     });
 
@@ -201,6 +234,16 @@ export default function Ledger() {
           </div>
           
           <select 
+            value={filterType} 
+            onChange={e => setFilterType(e.target.value)}
+            className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors cursor-pointer"
+          >
+            <option value="">All Types</option>
+            <option value="IN">Stock In</option>
+            <option value="OUT">Used</option>
+          </select>
+
+          <select 
             value={filterItem} 
             onChange={e => setFilterItem(e.target.value)}
             className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors cursor-pointer"
@@ -230,11 +273,11 @@ export default function Ledger() {
             Export PDF
           </button>
           <button 
-            onClick={openConsumeModal}
-            className="flex items-center px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg shadow-sm shadow-orange-500/20 transition-colors"
+            onClick={openTransactionModal}
+            className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-sm shadow-blue-500/20 transition-colors"
           >
             <PackageOpen className="h-4 w-4 mr-2" />
-            Consume Stock
+            Add Transaction
           </button>
         </div>
 
@@ -282,7 +325,7 @@ export default function Ledger() {
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {entry.type === 'IN' ? (entry.supplier || 'N/A') : '-'}
+                      {entry.type === 'IN' ? (entry.supplier?.name || 'N/A') : '-'}
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -308,50 +351,153 @@ export default function Ledger() {
         </div>
       </div>
 
-      {/* Consume Modal */}
-      {isConsumeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
-            <div className="p-6 border-b border-gray-200 dark:border-zinc-800 bg-orange-50/50 dark:bg-orange-900/10">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Consume Stock</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Assign an item from inventory to a machine.</p>
+      {/* Unified Transaction Modal */}
+      {isTransactionModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 dark:bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white dark:bg-[#09090b] rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden border border-gray-200 dark:border-zinc-800 my-8">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-zinc-800 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add Transaction</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Process multiple items in a single transaction.</p>
+              </div>
+              <button onClick={() => setIsTransactionModalOpen(false)} className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">×</button>
             </div>
-            <form onSubmit={handleConsumeSubmit} className="p-6 space-y-4">
-              {errorMsg && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{errorMsg}</div>}
+            
+            <form onSubmit={handleTransactionSubmit} className="p-6 space-y-6">
+              {errorMsg && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm rounded-lg border border-red-100 dark:border-red-900/50">
+                  {errorMsg}
+                </div>
+              )}
               
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Select Item</label>
-                <select required value={consumeForm.item} onChange={e => setConsumeForm({...consumeForm, item: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-zinc-700 rounded-lg bg-gray-50 dark:bg-zinc-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                  <option value="">-- Choose Item --</option>
-                  {items.map(item => (
-                    <option key={item._id} value={item._id}>{item.name} ({item.currentStock} {item.unit} available)</option>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Transaction Type</label>
+                  <select 
+                    required 
+                    value={transactionForm.type} 
+                    onChange={e => setTransactionForm({...transactionForm, type: e.target.value})}
+                    className="w-full px-4 py-2 bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-gray-900 dark:text-white"
+                  >
+                    <option value="IN">Stock In (Purchase)</option>
+                    <option value="OUT">Used (Consume)</option>
+                  </select>
+                </div>
+
+                {transactionForm.type === 'IN' ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Supplier</label>
+                    <select 
+                      required 
+                      value={transactionForm.supplier} 
+                      onChange={e => setTransactionForm({...transactionForm, supplier: e.target.value})}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-gray-900 dark:text-white"
+                    >
+                      <option value="">-- Choose Supplier --</option>
+                      {suppliers.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Machine</label>
+                    <select 
+                      required 
+                      value={transactionForm.machine} 
+                      onChange={e => setTransactionForm({...transactionForm, machine: e.target.value})}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-gray-900 dark:text-white"
+                    >
+                      <option value="">-- Choose Machine --</option>
+                      {machines.map(m => <option key={m._id} value={m._id}>{m.name} ({m.code})</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Global Remarks (Optional)</label>
+                <input 
+                  type="text" 
+                  value={transactionForm.remarks} 
+                  onChange={e => setTransactionForm({...transactionForm, remarks: e.target.value})}
+                  placeholder="Invoice # or common reason"
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-gray-900 dark:text-white" 
+                />
+              </div>
+
+              <div className="border-t border-gray-200 dark:border-zinc-800 pt-4">
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white">Items in Transaction</h4>
+                  <button 
+                    type="button" 
+                    onClick={addItemRow}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 flex items-center"
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Add Another Item
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  {transactionForm.items.map((item, index) => (
+                    <div key={index} className="flex items-start gap-3 bg-gray-50 dark:bg-zinc-900/30 p-3 rounded-xl border border-gray-100 dark:border-zinc-800/50">
+                      <div className="flex-1">
+                        <label className="block text-xs text-gray-500 mb-1">Item</label>
+                        <select 
+                          required 
+                          value={item.item} 
+                          onChange={e => handleItemChange(index, 'item', e.target.value)}
+                          className="w-full px-3 py-1.5 bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-lg text-sm outline-none"
+                        >
+                          <option value="">-- Select Item --</option>
+                          {items.map(i => (
+                            <option key={i._id} value={i._id}>
+                              {i.name} {transactionForm.type === 'OUT' ? `(${i.currentStock} ${i.unit} available)` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="w-24">
+                        <label className="block text-xs text-gray-500 mb-1">Quantity</label>
+                        <input 
+                          type="number" 
+                          required 
+                          min="0.01" 
+                          step="0.01"
+                          value={item.quantity} 
+                          onChange={e => handleItemChange(index, 'quantity', e.target.value)}
+                          className="w-full px-3 py-1.5 bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-lg text-sm outline-none" 
+                        />
+                      </div>
+                      {transactionForm.items.length > 1 && (
+                        <div className="pt-5">
+                          <button 
+                            type="button" 
+                            onClick={() => removeItemRow(index)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 transition-colors bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-lg"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ))}
-                </select>
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Select Machine</label>
-                <select required value={consumeForm.machine} onChange={e => setConsumeForm({...consumeForm, machine: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-zinc-700 rounded-lg bg-gray-50 dark:bg-zinc-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                  <option value="">-- Choose Machine --</option>
-                  {machines.map(machine => (
-                    <option key={machine._id} value={machine._id}>{machine.name} ({machine.code})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Quantity Used</label>
-                <input type="number" required step="0.01" min="0.01" value={consumeForm.quantity} onChange={e => setConsumeForm({...consumeForm, quantity: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-zinc-700 rounded-lg bg-gray-50 dark:bg-zinc-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Remarks / Reason</label>
-                <input type="text" value={consumeForm.remarks} onChange={e => setConsumeForm({...consumeForm, remarks: e.target.value})} placeholder="e.g. Regular maintenance replacement" className="w-full px-3 py-2 border border-gray-200 dark:border-zinc-700 rounded-lg bg-gray-50 dark:bg-zinc-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-              </div>
-
-              <div className="pt-4 flex justify-end space-x-3">
-                <button type="button" onClick={() => setIsConsumeModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors">Cancel</button>
-                <button type="submit" disabled={isLoading} className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors">{isLoading ? 'Processing...' : 'Confirm Consumption'}</button>
+              <div className="pt-2 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsTransactionModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-sm shadow-blue-500/20 transition-colors disabled:opacity-50"
+                >
+                  {isLoading ? 'Processing...' : 'Submit Transaction'}
+                </button>
               </div>
             </form>
           </div>

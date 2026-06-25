@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Package, ArrowDownToLine, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertTriangle, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 
 export default function Inventory() {
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
-  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   
   const [itemForm, setItemForm] = useState({ name: '', sku: '', description: '', unit: 'pcs', minStockAlert: 5 });
-  const [stockForm, setStockForm] = useState({ item: '', quantity: '', price: '', supplier: '', remarks: '' });
   
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -62,30 +62,6 @@ export default function Inventory() {
     }
   };
 
-  const handleStockSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setErrorMsg('');
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/ledger/in`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(stockForm)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setIsStockModalOpen(false);
-        fetchItems();
-      } else {
-        setErrorMsg(data.message || 'Error adding stock');
-      }
-    } catch (err) {
-      setErrorMsg('Network error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleDeleteItem = async (id) => {
     if (confirm('Are you sure you want to delete this item?')) {
@@ -108,11 +84,6 @@ export default function Inventory() {
     setIsItemModalOpen(true);
   };
 
-  const openStockModal = (item) => {
-    setStockForm({ item: item._id, quantity: '', price: '', supplier: '', remarks: '' });
-    setErrorMsg('');
-    setIsStockModalOpen(true);
-  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -169,8 +140,11 @@ export default function Inventory() {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right space-x-3">
-                    <button onClick={() => openStockModal(item)} className="inline-flex items-center text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors bg-blue-50 dark:bg-blue-900/20 px-2.5 py-1.5 rounded-lg">
-                      <ArrowDownToLine className="h-3.5 w-3.5 mr-1" /> Add Stock
+                    <button
+                      onClick={() => navigate(`/dashboard/inventory/${item._id}/ledger`)}
+                      className="inline-flex items-center text-xs font-medium text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 transition-colors bg-purple-50 dark:bg-purple-900/20 px-2.5 py-1.5 rounded-lg"
+                    >
+                      <FileText className="h-3.5 w-3.5 mr-1" /> View Ledger
                     </button>
                     <button onClick={() => openItemModal(item)} className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                       <Edit2 className="h-4 w-4" />
@@ -228,44 +202,6 @@ export default function Inventory() {
         </div>
       )}
 
-      {/* Add Stock Modal */}
-      {isStockModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
-            <div className="p-6 border-b border-gray-200 dark:border-zinc-800 bg-blue-50/50 dark:bg-blue-900/10">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Purchase / Add Stock</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Add newly purchased inventory to the ledger.</p>
-            </div>
-            <form onSubmit={handleStockSubmit} className="p-6 space-y-4">
-              {errorMsg && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{errorMsg}</div>}
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Quantity</label>
-                  <input type="number" required step="0.01" min="0.01" value={stockForm.quantity} onChange={e => setStockForm({...stockForm, quantity: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-zinc-700 rounded-lg bg-gray-50 dark:bg-zinc-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Price / Cost</label>
-                  <input type="number" required min="0" step="0.01" value={stockForm.price} onChange={e => setStockForm({...stockForm, price: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-zinc-700 rounded-lg bg-gray-50 dark:bg-zinc-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-                </div>
-                <div className="col-span-2 space-y-1">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Supplier Name</label>
-                  <input type="text" value={stockForm.supplier} onChange={e => setStockForm({...stockForm, supplier: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-zinc-700 rounded-lg bg-gray-50 dark:bg-zinc-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-                </div>
-                <div className="col-span-2 space-y-1">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Remarks / Invoice #</label>
-                  <input type="text" value={stockForm.remarks} onChange={e => setStockForm({...stockForm, remarks: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-zinc-700 rounded-lg bg-gray-50 dark:bg-zinc-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-                </div>
-              </div>
-
-              <div className="pt-4 flex justify-end space-x-3">
-                <button type="button" onClick={() => setIsStockModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors">Cancel</button>
-                <button type="submit" disabled={isLoading} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">{isLoading ? 'Processing...' : 'Confirm Stock'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
