@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, ArrowUpRight, ArrowDownRight, Package,
+  ArrowLeft, ArrowUpRight, ArrowDownRight, Briefcase,
   Download, TrendingUp, TrendingDown, Layers
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { API_BASE_URL } from '../config';
 
-export default function ItemLedger() {
+export default function SupplierLedger() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const [item, setItem] = useState(null);
+  const [supplier, setSupplier] = useState(null);
   const [ledger, setLedger] = useState([]);
   const [filterType, setFilterType] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -22,31 +22,32 @@ export default function ItemLedger() {
   const token = JSON.parse(localStorage.getItem('userInfo'))?.token;
 
   useEffect(() => {
-    fetchItem();
+    fetchSupplier();
   }, []);
 
   useEffect(() => {
     if (id) fetchLedger();
   }, [id, filterType, startDate, endDate]);
 
-  const fetchItem = async () => {
+  const fetchSupplier = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/items/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/suppliers`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
-        setItem(data);
+        const found = data.find(s => s._id === id);
+        if (found) setSupplier(found);
       }
     } catch (err) {
-      console.error('Failed to fetch item');
+      console.error('Failed to fetch supplier');
     }
   };
 
   const fetchLedger = async () => {
     setIsLoading(true);
     try {
-      let url = `${API_BASE_URL}/api/ledger?itemId=${id}`;
+      let url = `${API_BASE_URL}/api/ledger?supplierId=${id}`;
       if (filterType) url += `&type=${filterType}`;
       if (startDate) url += `&startDate=${startDate}`;
       if (endDate) url += `&endDate=${endDate}`;
@@ -65,18 +66,13 @@ export default function ItemLedger() {
     }
   };
 
-  // Calculate stats from full ledger (no type filter) for the stats row
-  const totalIn = ledger.filter(e => e.type === 'IN').reduce((sum, e) => sum + e.quantity, 0);
-  const totalOut = ledger.filter(e => e.type === 'OUT').reduce((sum, e) => sum + e.quantity, 0);
-
-  // Running balance calculation (full list, oldest first)
   const sortedLedger = [...ledger].sort((a, b) => new Date(a.date) - new Date(b.date));
-  let runningBalance = 0;
-  const ledgerWithBalance = sortedLedger.map(entry => {
-    if (entry.type === 'IN') runningBalance += entry.quantity;
-    else runningBalance -= entry.quantity;
-    return { ...entry, balance: runningBalance };
-  });
+  const totalTransactions = sortedLedger.length;
+  const stockInCount = sortedLedger.filter(e => e.type === 'IN').length;
+  const stockOutCount = sortedLedger.filter(e => e.type === 'OUT').length;
+  
+  const totalCreditQty = sortedLedger.filter(e => e.type === 'IN').reduce((sum, e) => sum + e.quantity, 0);
+  const totalDebitQty = sortedLedger.filter(e => e.type === 'OUT').reduce((sum, e) => sum + e.quantity, 0);
 
   const exportPDF = () => {
     const doc = new jsPDF();
@@ -87,61 +83,48 @@ export default function ItemLedger() {
 
     doc.setFontSize(14);
     doc.setTextColor(40, 40, 40);
-    doc.text(`Item Stock Report: ${item?.name || ''}`, 14, 27);
-
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`SKU: ${item?.sku || ''}  |  Unit: ${item?.unit || ''}  |  Current Stock: ${item?.currentStock ?? 0} ${item?.unit || ''}`, 14, 34);
+    doc.text(`Supplier Ledger: ${supplier?.name || ''}`, 14, 27);
 
     let dateRange = 'Date Range: All Time';
     if (startDate && endDate) dateRange = `Date Range: ${startDate} to ${endDate}`;
     else if (startDate) dateRange = `From: ${startDate}`;
     else if (endDate) dateRange = `Until: ${endDate}`;
-    doc.text(dateRange, 14, 40);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 46);
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(dateRange, 14, 34);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 40);
 
-    // Summary boxes
-    doc.setFontSize(11);
-    doc.setTextColor(37, 99, 235);
-    doc.text(`Total IN: +${totalIn} ${item?.unit || ''}`, 14, 55);
-    doc.setTextColor(234, 88, 12);
-    doc.text(`Total OUT: -${totalOut} ${item?.unit || ''}`, 80, 55);
-    doc.setTextColor(40, 40, 40);
-    doc.text(`Current Stock: ${item?.currentStock ?? 0} ${item?.unit || ''}`, 150, 55);
-
-    const tableColumn = ['Date', 'Machine / Supplier', 'Remarks', 'Credit (IN)', 'Debit (OUT)', 'Balance'];
-    const tableRows = ledgerWithBalance.map(entry => [
+    const tableColumn = ['Date', 'Item', 'Remarks', 'Credit (IN)', 'Debit (OUT)'];
+    const tableRows = sortedLedger.map(entry => [
       new Date(entry.date).toLocaleDateString(),
-      entry.type === 'OUT' ? (entry.machine?.name || '-') : (entry.supplier?.name || '-'),
+      entry.item?.name || '-',
       entry.remarks || '-',
-      entry.type === 'IN' ? `+${entry.quantity} ${item?.unit || ''}` : '-',
-      entry.type === 'OUT' ? `-${entry.quantity} ${item?.unit || ''}` : '-',
-      `${entry.balance} ${item?.unit || ''}`
+      entry.type === 'IN' ? `+${entry.quantity} ${entry.item?.unit || ''}` : '-',
+      entry.type === 'OUT' ? `-${entry.quantity} ${entry.item?.unit || ''}` : '-'
     ]);
-    
+
     // Add Total Row to PDF
     tableRows.push([
       'TOTAL',
       '-',
       '-',
-      `+${totalIn} ${item?.unit || ''}`,
-      `-${totalOut} ${item?.unit || ''}`,
-      `${ledgerWithBalance.length > 0 ? ledgerWithBalance[ledgerWithBalance.length - 1].balance : 0} ${item?.unit || ''}`
+      `+${totalCreditQty}`,
+      `-${totalDebitQty}`
     ]);
 
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
-      startY: 60,
+      startY: 46,
       theme: 'grid',
       headStyles: { fillColor: [37, 99, 235], textColor: 255, fontSize: 9, fontStyle: 'bold', halign: 'center' },
       bodyStyles: { fontSize: 8.5, textColor: 50 },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       columnStyles: {
-        0: { halign: 'center', cellWidth: 22 },
-        1: { halign: 'center', cellWidth: 24 },
-        2: { halign: 'center', cellWidth: 24 },
-        3: { halign: 'center', cellWidth: 24 },
+        0: { halign: 'center', cellWidth: 26 },
+        1: { halign: 'center', cellWidth: 40 },
+        3: { halign: 'center', cellWidth: 26 },
+        4: { halign: 'center', cellWidth: 26 },
       },
       didDrawPage: (data) => {
         doc.setFontSize(8);
@@ -150,7 +133,7 @@ export default function ItemLedger() {
       }
     });
 
-    doc.save(`Stock_Report_${item?.name || id}_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`Supplier_Ledger_${supplier?.name || id}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   return (
@@ -160,7 +143,7 @@ export default function ItemLedger() {
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-4">
           <button
-            onClick={() => navigate('/dashboard/inventory')}
+            onClick={() => navigate('/dashboard/suppliers')}
             className="mt-1 p-2 rounded-lg bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors shadow-sm"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -168,14 +151,14 @@ export default function ItemLedger() {
           <div>
             <div className="flex items-center gap-2">
               <div className="h-10 w-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                <Package className="h-5 w-5" />
+                <Briefcase className="h-5 w-5" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
-                  {item?.name || 'Loading...'}
+                  {supplier?.name || 'Loading...'}
                 </h1>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  SKU: <span className="font-mono">{item?.sku}</span> · Unit: {item?.unit}
+                  Supplier Ledger
                 </p>
               </div>
             </div>
@@ -186,7 +169,7 @@ export default function ItemLedger() {
           className="flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors"
         >
           <Download className="h-4 w-4 mr-2" />
-          Export Stock Report
+          Export Ledger
         </button>
       </div>
 
@@ -194,47 +177,35 @@ export default function ItemLedger() {
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">Total Stock In</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">Total Received (IN)</span>
             <div className="h-9 w-9 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
               <TrendingDown className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-green-600 dark:text-green-400">+{totalIn}</p>
-          <p className="text-xs text-gray-400 mt-1">{item?.unit} purchased (filtered view)</p>
+          <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stockInCount}</p>
+          <p className="text-xs text-gray-400 mt-1">transactions</p>
         </div>
 
         <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">Total Used</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">Total Returned (OUT)</span>
             <div className="h-9 w-9 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
               <TrendingUp className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">-{totalOut}</p>
-          <p className="text-xs text-gray-400 mt-1">{item?.unit} consumed (filtered view)</p>
+          <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{stockOutCount}</p>
+          <p className="text-xs text-gray-400 mt-1">transactions</p>
         </div>
 
         <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">Current Stock</span>
-            <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${
-              item?.currentStock <= (item?.minStockAlert || 0)
-                ? 'bg-red-100 dark:bg-red-900/20'
-                : 'bg-blue-100 dark:bg-blue-900/20'
-            }`}>
-              <Layers className={`h-5 w-5 ${
-                item?.currentStock <= (item?.minStockAlert || 0)
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-blue-600 dark:text-blue-400'
-              }`} />
+            <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">Total Transactions</span>
+            <div className="h-9 w-9 rounded-lg flex items-center justify-center bg-blue-100 dark:bg-blue-900/20">
+              <Layers className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
-          <p className={`text-2xl font-bold ${
-            item?.currentStock <= (item?.minStockAlert || 0)
-              ? 'text-red-600 dark:text-red-400'
-              : 'text-blue-600 dark:text-blue-400'
-          }`}>{item?.currentStock ?? 0}</p>
-          <p className="text-xs text-gray-400 mt-1">{item?.unit} remaining · Alert at {item?.minStockAlert}</p>
+          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalTransactions}</p>
+          <p className="text-xs text-gray-400 mt-1">records found</p>
         </div>
       </div>
 
@@ -247,7 +218,7 @@ export default function ItemLedger() {
         >
           <option value="">All Types</option>
           <option value="IN">Stock In Only</option>
-          <option value="OUT">Used Only</option>
+          <option value="OUT">Returned / Used Only</option>
         </select>
 
         <input
@@ -275,40 +246,33 @@ export default function ItemLedger() {
             <thead>
               <tr className="bg-gray-50 dark:bg-zinc-900/50 border-b border-gray-200 dark:border-zinc-800">
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Machine / Supplier</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Item</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Remarks</th>
                 <th className="px-6 py-4 text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider">Credit (IN)</th>
                 <th className="px-6 py-4 text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wider">Debit (OUT)</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Balance</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-zinc-800">
               {isLoading ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-10 text-center text-gray-400 dark:text-gray-500 text-sm">Loading...</td>
+                  <td colSpan="5" className="px-6 py-10 text-center text-gray-400 dark:text-gray-500 text-sm">Loading...</td>
                 </tr>
-              ) : ledgerWithBalance.length === 0 ? (
+              ) : sortedLedger.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-10 text-center">
-                    <Package className="h-10 w-10 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
-                    <p className="text-sm text-gray-500 dark:text-gray-400">No transactions found for this item.</p>
+                  <td colSpan="5" className="px-6 py-10 text-center">
+                    <Briefcase className="h-10 w-10 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No transactions found for this supplier.</p>
                   </td>
                 </tr>
               ) : (
-                ledgerWithBalance.map((entry) => (
+                sortedLedger.map((entry) => (
                   <tr key={entry._id} className="hover:bg-gray-50 dark:hover:bg-zinc-900/20 transition-colors">
                     <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                       {new Date(entry.date).toLocaleString()}
                     </td>
                     <td className="px-6 py-4">
-                      {entry.type === 'OUT' ? (
-                        <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{entry.machine?.name || '-'}</div>
-                          <div className="text-xs text-gray-400">{entry.machine?.code || ''}</div>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-700 dark:text-gray-300">{entry.supplier?.name || '-'}</span>
-                      )}
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">{entry.item?.name || '-'}</div>
+                      <div className="text-xs text-gray-400">{entry.item?.sku || ''}</div>
                     </td>
                     <td className="px-6 py-4 text-xs text-gray-500 dark:text-gray-400">
                       {entry.remarks || '—'}
@@ -317,7 +281,7 @@ export default function ItemLedger() {
                       {entry.type === 'IN' ? (
                         <span className="text-sm font-bold text-green-600 dark:text-green-400">
                           +{entry.quantity}
-                          <span className="text-xs font-normal text-gray-400 ml-1">{item?.unit}</span>
+                          <span className="text-xs font-normal text-gray-400 ml-1">{entry.item?.unit}</span>
                         </span>
                       ) : (
                         <span className="text-sm text-gray-400 dark:text-gray-500">—</span>
@@ -327,41 +291,30 @@ export default function ItemLedger() {
                       {entry.type === 'OUT' ? (
                         <span className="text-sm font-bold text-red-600 dark:text-red-400">
                           -{entry.quantity}
-                          <span className="text-xs font-normal text-gray-400 ml-1">{item?.unit}</span>
+                          <span className="text-xs font-normal text-gray-400 ml-1">{entry.item?.unit}</span>
                         </span>
                       ) : (
                         <span className="text-sm text-gray-400 dark:text-gray-500">—</span>
                       )}
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {entry.balance}
-                        <span className="text-xs font-normal text-gray-400 ml-1">{item?.unit}</span>
-                      </span>
-                    </td>
                   </tr>
                 ))
               )}
             </tbody>
-            {ledgerWithBalance.length > 0 && !isLoading && (
+            {sortedLedger.length > 0 && !isLoading && (
               <tfoot className="bg-gray-50 dark:bg-zinc-900/80 border-t-2 border-gray-200 dark:border-zinc-700">
                 <tr>
                   <td colSpan="3" className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white text-right uppercase tracking-wider">
-                    Total:
+                    Total Qty:
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm font-bold text-green-600 dark:text-green-400">
-                      +{totalIn} <span className="text-xs font-normal text-gray-400 ml-1">{item?.unit}</span>
+                      +{totalCreditQty}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm font-bold text-red-600 dark:text-red-400">
-                      -{totalOut} <span className="text-xs font-normal text-gray-400 ml-1">{item?.unit}</span>
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm font-bold text-gray-900 dark:text-white">
-                      {ledgerWithBalance[ledgerWithBalance.length - 1].balance} <span className="text-xs font-normal text-gray-400 ml-1">{item?.unit}</span>
+                      -{totalDebitQty}
                     </span>
                   </td>
                 </tr>

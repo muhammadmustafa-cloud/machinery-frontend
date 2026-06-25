@@ -158,20 +158,31 @@ export default function Ledger() {
     
     doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 40);
 
-    const tableColumn = ["Date", "Type", "Item", "Quantity", "Machine", "Supplier", "Remarks"];
-    const tableRows = [];
+    const sortedLedger = [...ledger].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const totalCreditQty = sortedLedger.filter(e => e.type === 'IN').reduce((sum, e) => sum + e.quantity, 0);
+    const totalDebitQty = sortedLedger.filter(e => e.type === 'OUT').reduce((sum, e) => sum + e.quantity, 0);
 
-    ledger.forEach(entry => {
-      const date = new Date(entry.date).toLocaleDateString();
-      const type = entry.type === 'IN' ? 'STOCK IN' : 'USED';
-      const item = `${entry.item?.name || 'Unknown'} (${entry.item?.sku || ''})`;
-      const qty = `${entry.type === 'IN' ? '+' : '-'}${entry.quantity} ${entry.item?.unit || ''}`;
-      const machine = entry.type === 'OUT' ? (entry.machine?.name || 'Unknown') : '-';
-      const supplier = entry.type === 'IN' ? (entry.supplier?.name || 'N/A') : '-';
-      const remarks = entry.remarks || (entry.type === 'IN' && entry.price ? `Cost: $${entry.price}` : '-');
-
-      tableRows.push([date, type, item, qty, machine, supplier, remarks]);
-    });
+    const tableColumn = ['Date', 'Type', 'Item Details', 'Quantity', 'Machine / Supplier', 'Remarks', 'User'];
+    const tableRows = sortedLedger.map(entry => [
+      new Date(entry.date).toLocaleString(),
+      entry.type === 'IN' ? 'STOCK IN' : 'USED',
+      `${entry.item?.name || 'Unknown'} (SKU: ${entry.item?.sku || '-'})`,
+      `${entry.type === 'IN' ? '+' : '-'}${entry.quantity} ${entry.item?.unit || ''}`,
+      entry.type === 'IN' ? (entry.supplier?.name || 'N/A') : (entry.machine?.name || 'N/A'),
+      entry.remarks || (entry.type === 'IN' && entry.price ? `Cost: $${entry.price}` : '-'),
+      entry.performedBy?.name || 'System'
+    ]);
+    
+    // Add Total Row to PDF
+    tableRows.push([
+      'TOTAL',
+      '-',
+      '-',
+      `+${totalCreditQty} IN / -${totalDebitQty} OUT`,
+      '-',
+      '-',
+      '-'
+    ]);
 
     autoTable(doc, {
       head: [tableColumn],
@@ -296,7 +307,7 @@ export default function Ledger() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-zinc-800">
-              {ledger.map((entry) => (
+              {[...ledger].sort((a, b) => new Date(a.date) - new Date(b.date)).map((entry) => (
                 <tr key={entry._id} className="hover:bg-gray-50 dark:hover:bg-zinc-900/20 transition-colors">
                   <td className="px-6 py-4">
                     {entry.type === 'IN' ? (
@@ -347,6 +358,23 @@ export default function Ledger() {
                 </tr>
               )}
             </tbody>
+            {ledger.length > 0 && !isLoading && (
+              <tfoot className="bg-gray-50 dark:bg-zinc-900/80 border-t-2 border-gray-200 dark:border-zinc-700">
+                <tr>
+                  <td colSpan="2" className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white text-right uppercase tracking-wider">
+                    Total Qty:
+                  </td>
+                  <td colSpan="5" className="px-6 py-4">
+                    <span className="text-sm font-bold text-green-600 dark:text-green-400 mr-4">
+                      +{ledger.filter(e => e.type === 'IN').reduce((sum, e) => sum + e.quantity, 0)} IN
+                    </span>
+                    <span className="text-sm font-bold text-red-600 dark:text-red-400">
+                      -{ledger.filter(e => e.type === 'OUT').reduce((sum, e) => sum + e.quantity, 0)} OUT
+                    </span>
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </div>

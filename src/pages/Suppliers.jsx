@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Briefcase } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Edit2, Trash2, Briefcase, FileText } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 export default function Suppliers() {
+  const navigate = useNavigate();
   const [suppliers, setSuppliers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
@@ -139,7 +141,14 @@ export default function Suppliers() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-3">
-                      <button onClick={() => openModal(supplier)} className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                      <button 
+                        onClick={() => navigate(`/dashboard/suppliers/${supplier._id}/ledger`)} 
+                        className="text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                        title="View Ledger"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => openModal(supplier)} className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors" title="Edit">
                         <Edit2 className="h-4 w-4" />
                       </button>
                       <button onClick={() => handleDelete(supplier._id)} className="text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors">
