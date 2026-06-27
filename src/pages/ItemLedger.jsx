@@ -87,7 +87,8 @@ export default function ItemLedger() {
 
     doc.setFontSize(14);
     doc.setTextColor(40, 40, 40);
-    doc.text(`Item Stock Report: ${item?.name || ''}`, 14, 27);
+    const pageWidth = doc.internal.pageSize.getWidth();
+    doc.text(`Item Stock Report: ${item?.name || ''}`, pageWidth / 2, 27, { align: 'center' });
 
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
