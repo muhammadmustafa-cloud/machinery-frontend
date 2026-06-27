@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Users, Settings, Package, FileText, Settings2, LogOut, Briefcase, CalendarDays } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, Package, FileText, Settings2, LogOut, Briefcase, CalendarDays, Layers } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 
@@ -11,6 +11,7 @@ export default function Sidebar() {
     { icon: Briefcase, label: 'Suppliers', path: '/dashboard/suppliers' },
     { icon: Package, label: 'Inventory', path: '/dashboard/inventory' },
     { icon: Settings2, label: 'Machinery', path: '/dashboard/machinery' },
+    { icon: Layers, label: 'Surmail', path: '/dashboard/surmail' },
     { icon: FileText, label: 'Transaction', path: '/dashboard/ledger' },
     { icon: Users, label: 'Users', path: '/dashboard/users' },
     { icon: Settings, label: 'Settings', path: '/dashboard/settings' },
