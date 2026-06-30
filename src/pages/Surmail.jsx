@@ -51,13 +51,16 @@ export default function Surmail() {
     doc.setTextColor(100, 100, 100);
     doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 34);
 
-    const tableColumn = ['Item Name', 'SKU', 'Description', 'Credit'];
-    const tableRows = filteredItems.map(item => [
-      item.name || '-',
-      item.sku || '-',
-      item.description || '-',
-      item.currentStock > 0 ? `+${item.currentStock} ${item.unit || ''}` : `${item.currentStock} ${item.unit || ''}`
-    ]);
+    const tableColumn = ['Item Name', 'Description', 'Credit', 'Debit'];
+    const tableRows = filteredItems.map(item => {
+      const isPositive = item.currentStock > 0;
+      return [
+        item.name || '-',
+        item.description || '-',
+        isPositive ? `+${item.currentStock} ${item.unit || ''}` : '-',
+        !isPositive ? `${item.currentStock} ${item.unit || ''}` : '-'
+      ];
+    });
 
     autoTable(doc, {
       head: [tableColumn],
@@ -114,9 +117,10 @@ export default function Surmail() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50 dark:bg-zinc-900/50 border-b border-gray-200 dark:border-zinc-800">
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Item Details</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Item Name</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-right">Remaining Stock (Credit)</th>
+                <th className="px-6 py-4 text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider text-right">Credit</th>
+                <th className="px-6 py-4 text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wider text-right">Debit</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-zinc-800">
@@ -138,7 +142,6 @@ export default function Surmail() {
                     <tr key={item._id} className="hover:bg-gray-50 dark:hover:bg-zinc-900/20 transition-colors">
                       <td className="px-6 py-4">
                         <div className="text-sm font-semibold text-gray-900 dark:text-white">{item.name}</div>
-                        <div className="text-xs font-mono text-gray-400 mt-0.5">{item.sku || 'No SKU'}</div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                         {item.description || '—'}
@@ -149,9 +152,16 @@ export default function Surmail() {
                             +{item.currentStock} <span className="text-xs font-normal text-gray-400 ml-1">{item.unit}</span>
                           </span>
                         ) : (
-                          <span className="text-sm font-semibold text-gray-400 dark:text-gray-500">
-                            {item.currentStock} <span className="text-xs font-normal text-gray-500 ml-1">{item.unit}</span>
+                          <span className="text-sm font-semibold text-gray-400 dark:text-gray-500">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {!isPositive ? (
+                          <span className="text-sm font-bold text-red-600 dark:text-red-400">
+                            {item.currentStock} <span className="text-xs font-normal text-gray-400 ml-1">{item.unit}</span>
                           </span>
+                        ) : (
+                          <span className="text-sm font-semibold text-gray-400 dark:text-gray-500">—</span>
                         )}
                       </td>
                     </tr>

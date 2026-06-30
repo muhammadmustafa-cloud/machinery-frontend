@@ -110,19 +110,24 @@ export default function ItemLedger() {
     doc.setTextColor(40, 40, 40);
     doc.text(`Current Stock: ${item?.currentStock ?? 0} ${item?.unit || ''}`, 150, 55);
 
-    const tableColumn = ['Date', 'Machine / Supplier', 'Remarks', 'Credit (IN)', 'Debit (OUT)', 'Balance'];
-    const tableRows = ledgerWithBalance.map(entry => [
-      new Date(entry.date).toLocaleDateString(),
-      entry.type === 'OUT' ? (entry.machine?.name || '-') : (entry.supplier?.name || '-'),
-      entry.remarks || '-',
-      entry.type === 'IN' ? `+${entry.quantity} ${item?.unit || ''}` : '-',
-      entry.type === 'OUT' ? `-${entry.quantity} ${item?.unit || ''}` : '-',
-      `${entry.balance} ${item?.unit || ''}`
-    ]);
+    const tableColumn = ['Date', 'Day', 'Machine / Supplier', 'Description', 'Credit (IN)', 'Debit (OUT)', 'Balance'];
+    const tableRows = ledgerWithBalance.map(entry => {
+      const d = new Date(entry.date);
+      return [
+        d.toLocaleDateString(),
+        d.toLocaleDateString('en-US', { weekday: 'short' }),
+        entry.type === 'OUT' ? (entry.machine?.name || '-') : (entry.supplier?.name || '-'),
+        entry.remarks || '-',
+        entry.type === 'IN' ? `+${entry.quantity} ${item?.unit || ''}` : '-',
+        entry.type === 'OUT' ? `-${entry.quantity} ${item?.unit || ''}` : '-',
+        `${entry.balance} ${item?.unit || ''}`
+      ];
+    });
     
     // Add Total Row to PDF
     tableRows.push([
       'TOTAL',
+      '-',
       '-',
       '-',
       `+${totalIn} ${item?.unit || ''}`,
@@ -276,8 +281,9 @@ export default function ItemLedger() {
             <thead>
               <tr className="bg-gray-50 dark:bg-zinc-900/50 border-b border-gray-200 dark:border-zinc-800">
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Day</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Machine / Supplier</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Remarks</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
                 <th className="px-6 py-4 text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider">Credit (IN)</th>
                 <th className="px-6 py-4 text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wider">Debit (OUT)</th>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Balance</th>
@@ -290,7 +296,7 @@ export default function ItemLedger() {
                 </tr>
               ) : ledgerWithBalance.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-10 text-center">
+                  <td colSpan="7" className="px-6 py-10 text-center">
                     <Package className="h-10 w-10 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
                     <p className="text-sm text-gray-500 dark:text-gray-400">No transactions found for this item.</p>
                   </td>
@@ -300,6 +306,9 @@ export default function ItemLedger() {
                   <tr key={entry._id} className="hover:bg-gray-50 dark:hover:bg-zinc-900/20 transition-colors">
                     <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                       {new Date(entry.date).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      {new Date(entry.date).toLocaleDateString('en-US', { weekday: 'short' })}
                     </td>
                     <td className="px-6 py-4">
                       {entry.type === 'OUT' ? (
@@ -347,7 +356,7 @@ export default function ItemLedger() {
             {ledgerWithBalance.length > 0 && !isLoading && (
               <tfoot className="bg-gray-50 dark:bg-zinc-900/80 border-t-2 border-gray-200 dark:border-zinc-700">
                 <tr>
-                  <td colSpan="3" className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white text-right uppercase tracking-wider">
+                  <td colSpan="4" className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-white text-right uppercase tracking-wider">
                     Total:
                   </td>
                   <td className="px-6 py-4">
