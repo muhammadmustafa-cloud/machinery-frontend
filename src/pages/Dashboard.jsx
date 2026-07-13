@@ -12,6 +12,7 @@ import ItemLedger from './ItemLedger';
 import DailyStock from './DailyStock';
 import SupplierLedger from './SupplierLedger';
 import Surmail from './Surmail';
+import MachineLedger from './MachineLedger';
 
 export default function Dashboard() {
   return (
@@ -33,6 +34,7 @@ export default function Dashboard() {
             <Route path="/suppliers/:id/ledger" element={<SupplierLedger />} />
             <Route path="/daily-stock" element={<DailyStock />} />
             <Route path="/surmail" element={<Surmail />} />
+            <Route path="/machinery/:id/ledger" element={<MachineLedger />} />
           </Routes>
         </main>
       </div>

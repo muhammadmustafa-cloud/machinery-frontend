@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Settings2, Activity, MapPin } from 'lucide-react';
+import { Plus, Edit2, Trash2, Settings2, Activity, MapPin, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 
 export default function Machinery() {
+  const navigate = useNavigate();
   const [machines, setMachines] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMachine, setEditingMachine] = useState(null);
@@ -134,7 +136,11 @@ export default function Machinery() {
             </div>
 
             <div className="mt-6 pt-4 border-t border-gray-100 dark:border-zinc-800">
-              <button className="w-full py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
+              <button
+                onClick={() => navigate(`/dashboard/machinery/${machine._id}/ledger`)}
+                className="w-full py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <FileText className="h-4 w-4" />
                 View Maintenance Ledger
               </button>
             </div>

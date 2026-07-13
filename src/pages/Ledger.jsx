@@ -11,11 +11,14 @@ export default function Ledger() {
   const [suppliers, setSuppliers] = useState([]);
   
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const todayLocal = () => new Date().toLocaleDateString('en-CA'); // gives YYYY-MM-DD in local tz
+
   const [transactionForm, setTransactionForm] = useState({
     type: 'IN',
     supplier: '',
     machine: '',
     remarks: '',
+    date: todayLocal(),
     items: [{ item: '', quantity: '', price: '' }]
   });
   
@@ -99,6 +102,7 @@ export default function Ledger() {
       supplier: '',
       machine: '',
       remarks: '',
+      date: todayLocal(),
       items: [{ item: '', quantity: '', price: '' }]
     });
     setErrorMsg('');
@@ -164,7 +168,7 @@ export default function Ledger() {
 
     const tableColumn = ['Date', 'Type', 'Item Details', 'Quantity', 'Machine / Supplier', 'Remarks', 'User'];
     const tableRows = sortedLedger.map(entry => [
-      new Date(entry.date).toLocaleString(),
+      new Date(entry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
       entry.type === 'IN' ? 'STOCK IN' : 'USED',
       `${entry.item?.name || 'Unknown'} (SKU: ${entry.item?.sku || '-'})`,
       `${entry.type === 'IN' ? '+' : '-'}${entry.quantity} ${entry.item?.unit || ''}`,
@@ -345,7 +349,7 @@ export default function Ledger() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {new Date(entry.date).toLocaleString()}
+                    {new Date(entry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </td>
                 </tr>
               ))}
@@ -509,6 +513,18 @@ export default function Ledger() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Date Picker */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Transaction Date</label>
+                <input
+                  type="date"
+                  required
+                  value={transactionForm.date}
+                  onChange={e => setTransactionForm({ ...transactionForm, date: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-500/50 outline-none text-gray-900 dark:text-white"
+                />
               </div>
 
               <div className="pt-2 flex justify-end space-x-3">

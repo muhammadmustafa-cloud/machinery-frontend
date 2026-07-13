@@ -305,7 +305,7 @@ export default function ItemLedger() {
                 ledgerWithBalance.map((entry) => (
                   <tr key={entry._id} className="hover:bg-gray-50 dark:hover:bg-zinc-900/20 transition-colors">
                     <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                      {new Date(entry.date).toLocaleString()}
+                      {new Date(entry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                       {new Date(entry.date).toLocaleDateString('en-US', { weekday: 'short' })}
