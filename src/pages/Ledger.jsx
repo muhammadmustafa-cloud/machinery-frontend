@@ -163,19 +163,25 @@ export default function Ledger() {
     doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 40);
 
     const sortedLedger = [...ledger].sort((a, b) => new Date(a.date) - new Date(b.date));
-    const totalCreditQty = sortedLedger.filter(e => e.type === 'IN').reduce((sum, e) => sum + e.quantity, 0);
-    const totalDebitQty = sortedLedger.filter(e => e.type === 'OUT').reduce((sum, e) => sum + e.quantity, 0);
+    const totalCreditQty = sortedLedger.filter(e => e.type === 'IN' || (e.type === 'ADJUSTMENT' && e.adjustmentType === 'ADD')).reduce((sum, e) => sum + e.quantity, 0);
+    const totalDebitQty = sortedLedger.filter(e => e.type === 'OUT' || (e.type === 'ADJUSTMENT' && e.adjustmentType === 'REMOVE')).reduce((sum, e) => sum + e.quantity, 0);
 
     const tableColumn = ['Date', 'Type', 'Item Details', 'Quantity', 'Machine / Supplier', 'Remarks', 'User'];
-    const tableRows = sortedLedger.map(entry => [
-      new Date(entry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-      entry.type === 'IN' ? 'STOCK IN' : 'USED',
-      `${entry.item?.name || 'Unknown'} (SKU: ${entry.item?.sku || '-'})`,
-      `${entry.type === 'IN' ? '+' : '-'}${entry.quantity} ${entry.item?.unit || ''}`,
-      entry.type === 'IN' ? (entry.supplier?.name || 'N/A') : (entry.machine?.name || 'N/A'),
-      entry.remarks || (entry.type === 'IN' && entry.price ? `Cost: $${entry.price}` : '-'),
-      entry.performedBy?.name || 'System'
-    ]);
+    const tableRows = sortedLedger.map(entry => {
+      let typeLabel = entry.type === 'IN' ? 'STOCK IN' : entry.type === 'OUT' ? 'USED' : 'ADJUSTMENT';
+      let sign = entry.type === 'IN' || (entry.type === 'ADJUSTMENT' && entry.adjustmentType === 'ADD') ? '+' : '-';
+      let entity = entry.type === 'IN' ? (entry.supplier?.name || 'N/A') : entry.type === 'OUT' ? (entry.machine?.name || 'N/A') : '-';
+      
+      return [
+        new Date(entry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        typeLabel,
+        `${entry.item?.name || 'Unknown'} (SKU: ${entry.item?.sku || '-'})`,
+        `${sign}${entry.quantity} ${entry.item?.unit || ''}`,
+        entity,
+        entry.remarks || (entry.type === 'IN' && entry.price ? `Cost: $${entry.price}` : '-'),
+        entry.performedBy?.name || 'System'
+      ];
+    });
     
     // Add Total Row to PDF
     tableRows.push([
@@ -318,9 +324,13 @@ export default function Ledger() {
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
                         <ArrowDownRight className="h-3 w-3 mr-1" /> STOCK IN
                       </span>
-                    ) : (
+                    ) : entry.type === 'OUT' ? (
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
                         <ArrowUpRight className="h-3 w-3 mr-1" /> USED
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">
+                        <ClipboardList className="h-3 w-3 mr-1" /> ADJUST
                       </span>
                     )}
                   </td>
@@ -330,7 +340,7 @@ export default function Ledger() {
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm font-bold text-gray-900 dark:text-white">
-                      {entry.type === 'IN' ? '+' : '-'}{entry.quantity} <span className="text-gray-500 text-xs font-normal">{entry.item?.unit}</span>
+                      {entry.type === 'IN' || (entry.type === 'ADJUSTMENT' && entry.adjustmentType === 'ADD') ? '+' : '-'}{entry.quantity} <span className="text-gray-500 text-xs font-normal">{entry.item?.unit}</span>
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -370,10 +380,10 @@ export default function Ledger() {
                   </td>
                   <td colSpan="5" className="px-6 py-4">
                     <span className="text-sm font-bold text-green-600 dark:text-green-400 mr-4">
-                      +{ledger.filter(e => e.type === 'IN').reduce((sum, e) => sum + e.quantity, 0)} IN
+                      +{ledger.filter(e => e.type === 'IN' || (e.type === 'ADJUSTMENT' && e.adjustmentType === 'ADD')).reduce((sum, e) => sum + e.quantity, 0)} IN
                     </span>
                     <span className="text-sm font-bold text-red-600 dark:text-red-400">
-                      -{ledger.filter(e => e.type === 'OUT').reduce((sum, e) => sum + e.quantity, 0)} OUT
+                      -{ledger.filter(e => e.type === 'OUT' || (e.type === 'ADJUSTMENT' && e.adjustmentType === 'REMOVE')).reduce((sum, e) => sum + e.quantity, 0)} OUT
                     </span>
                   </td>
                 </tr>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Package, AlertTriangle, FileText } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertTriangle, FileText, PlusSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 
@@ -10,6 +10,10 @@ export default function Inventory() {
   const [editingItem, setEditingItem] = useState(null);
   
   const [itemForm, setItemForm] = useState({ name: '', sku: '', description: '', unit: 'pcs', minStockAlert: 5 });
+  
+  const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false);
+  const [adjustmentItem, setAdjustmentItem] = useState(null);
+  const [adjustmentForm, setAdjustmentForm] = useState({ quantity: '', date: new Date().toLocaleDateString('en-CA'), remarks: 'Old stock entry' });
   
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -54,6 +58,46 @@ export default function Inventory() {
         fetchItems();
       } else {
         setErrorMsg(data.message || 'Error saving item');
+      }
+    } catch (err) {
+      setErrorMsg('Network error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const openAdjustmentModal = (item) => {
+    setAdjustmentItem(item);
+    setAdjustmentForm({ quantity: '', date: new Date().toLocaleDateString('en-CA'), remarks: 'Old stock entry' });
+    setErrorMsg('');
+    setIsAdjustmentModalOpen(true);
+  };
+
+  const handleAdjustmentSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setErrorMsg('');
+
+    try {
+      const payload = {
+        type: 'ADJUSTMENT',
+        adjustmentType: 'ADD',
+        date: adjustmentForm.date,
+        remarks: adjustmentForm.remarks,
+        items: [{ item: adjustmentItem._id, quantity: adjustmentForm.quantity }]
+      };
+
+      const res = await fetch(`${API_BASE_URL}/api/ledger/transaction`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setIsAdjustmentModalOpen(false);
+        fetchItems();
+      } else {
+        setErrorMsg(data.message || 'Error processing adjustment');
       }
     } catch (err) {
       setErrorMsg('Network error');
@@ -146,6 +190,9 @@ export default function Inventory() {
                     >
                       <FileText className="h-3.5 w-3.5 mr-1" /> View Ledger
                     </button>
+                    <button onClick={() => openAdjustmentModal(item)} className="text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition-colors" title="Add Old Stock">
+                      <PlusSquare className="h-4 w-4" />
+                    </button>
                     <button onClick={() => openItemModal(item)} className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                       <Edit2 className="h-4 w-4" />
                     </button>
@@ -196,6 +243,39 @@ export default function Inventory() {
               <div className="pt-4 flex justify-end space-x-3">
                 <button type="button" onClick={() => setIsItemModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors">Cancel</button>
                 <button type="submit" disabled={isLoading} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">{isLoading ? 'Saving...' : 'Save Item'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Adjustment Modal */}
+      {isAdjustmentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-[#09090b] border border-gray-200 dark:border-zinc-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-gray-200 dark:border-zinc-800">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Add Stock</h2>
+              <p className="text-xs text-gray-500 mt-1">{adjustmentItem?.name} ({adjustmentItem?.sku})</p>
+            </div>
+            <form onSubmit={handleAdjustmentSubmit} className="p-5 space-y-4">
+              {errorMsg && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{errorMsg}</div>}
+              
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Quantity to Add</label>
+                <input type="number" required min="0.01" step="0.01" value={adjustmentForm.quantity} onChange={e => setAdjustmentForm({...adjustmentForm, quantity: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-zinc-700 rounded-lg bg-gray-50 dark:bg-zinc-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Date</label>
+                <input type="date" required value={adjustmentForm.date} onChange={e => setAdjustmentForm({...adjustmentForm, date: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-zinc-700 rounded-lg bg-gray-50 dark:bg-zinc-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Remarks</label>
+                <input type="text" value={adjustmentForm.remarks} onChange={e => setAdjustmentForm({...adjustmentForm, remarks: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-zinc-700 rounded-lg bg-gray-50 dark:bg-zinc-800/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+              </div>
+
+              <div className="pt-2 flex justify-end space-x-3">
+                <button type="button" onClick={() => setIsAdjustmentModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors">Cancel</button>
+                <button type="submit" disabled={isLoading} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors">{isLoading ? 'Saving...' : 'Add Stock'}</button>
               </div>
             </form>
           </div>

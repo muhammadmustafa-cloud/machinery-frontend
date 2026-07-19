@@ -66,15 +66,15 @@ export default function ItemLedger() {
   };
 
   // Calculate stats from full ledger (no type filter) for the stats row
-  const totalIn = ledger.filter(e => e.type === 'IN').reduce((sum, e) => sum + e.quantity, 0);
-  const totalOut = ledger.filter(e => e.type === 'OUT').reduce((sum, e) => sum + e.quantity, 0);
+  const totalIn = ledger.filter(e => e.type === 'IN' || (e.type === 'ADJUSTMENT' && e.adjustmentType === 'ADD')).reduce((sum, e) => sum + e.quantity, 0);
+  const totalOut = ledger.filter(e => e.type === 'OUT' || (e.type === 'ADJUSTMENT' && e.adjustmentType === 'REMOVE')).reduce((sum, e) => sum + e.quantity, 0);
 
   // Running balance calculation (full list, oldest first)
   const sortedLedger = [...ledger].sort((a, b) => new Date(a.date) - new Date(b.date));
   let runningBalance = 0;
   const ledgerWithBalance = sortedLedger.map(entry => {
-    if (entry.type === 'IN') runningBalance += entry.quantity;
-    else runningBalance -= entry.quantity;
+    if (entry.type === 'IN' || (entry.type === 'ADJUSTMENT' && entry.adjustmentType === 'ADD')) runningBalance += entry.quantity;
+    else if (entry.type === 'OUT' || (entry.type === 'ADJUSTMENT' && entry.adjustmentType === 'REMOVE')) runningBalance -= entry.quantity;
     return { ...entry, balance: runningBalance };
   });
 
@@ -113,13 +113,16 @@ export default function ItemLedger() {
     const tableColumn = ['Date', 'Day', 'Machine / Supplier', 'Description', 'Credit (IN)', 'Debit (OUT)', 'Balance'];
     const tableRows = ledgerWithBalance.map(entry => {
       const d = new Date(entry.date);
+      let entity = entry.type === 'IN' ? (entry.supplier?.name || '-') : entry.type === 'OUT' ? (entry.machine?.name || '-') : 'Adjustment';
+      let isCredit = entry.type === 'IN' || (entry.type === 'ADJUSTMENT' && entry.adjustmentType === 'ADD');
+      let isDebit = entry.type === 'OUT' || (entry.type === 'ADJUSTMENT' && entry.adjustmentType === 'REMOVE');
       return [
         d.toLocaleDateString(),
         d.toLocaleDateString('en-US', { weekday: 'short' }),
-        entry.type === 'OUT' ? (entry.machine?.name || '-') : (entry.supplier?.name || '-'),
+        entity,
         entry.remarks || '-',
-        entry.type === 'IN' ? `+${entry.quantity} ${item?.unit || ''}` : '-',
-        entry.type === 'OUT' ? `-${entry.quantity} ${item?.unit || ''}` : '-',
+        isCredit ? `+${entry.quantity} ${item?.unit || ''}` : '-',
+        isDebit ? `-${entry.quantity} ${item?.unit || ''}` : '-',
         `${entry.balance} ${item?.unit || ''}`
       ];
     });
@@ -316,15 +319,17 @@ export default function ItemLedger() {
                           <div className="text-sm font-medium text-gray-900 dark:text-white">{entry.machine?.name || '-'}</div>
                           <div className="text-xs text-gray-400">{entry.machine?.code || ''}</div>
                         </div>
-                      ) : (
+                      ) : entry.type === 'IN' ? (
                         <span className="text-sm text-gray-700 dark:text-gray-300">{entry.supplier?.name || '-'}</span>
+                      ) : (
+                        <span className="text-sm font-medium text-purple-600 dark:text-purple-400">Stock Adjustment</span>
                       )}
                     </td>
                     <td className="px-6 py-4 text-xs text-gray-500 dark:text-gray-400">
                       {entry.remarks || '—'}
                     </td>
                     <td className="px-6 py-4">
-                      {entry.type === 'IN' ? (
+                      {(entry.type === 'IN' || (entry.type === 'ADJUSTMENT' && entry.adjustmentType === 'ADD')) ? (
                         <span className="text-sm font-bold text-green-600 dark:text-green-400">
                           +{entry.quantity}
                           <span className="text-xs font-normal text-gray-400 ml-1">{item?.unit}</span>
@@ -334,7 +339,7 @@ export default function ItemLedger() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      {entry.type === 'OUT' ? (
+                      {(entry.type === 'OUT' || (entry.type === 'ADJUSTMENT' && entry.adjustmentType === 'REMOVE')) ? (
                         <span className="text-sm font-bold text-red-600 dark:text-red-400">
                           -{entry.quantity}
                           <span className="text-xs font-normal text-gray-400 ml-1">{item?.unit}</span>
